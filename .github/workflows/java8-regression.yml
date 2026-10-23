@@ -1,0 +1,58 @@
+name: Byblack Java 8 Regression
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  java8-regression:
+    name: Java 8 API and JUnit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Gradle 9.6.0
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+
+      - name: Compile and test against Java 8 APIs
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/java8-release.gradle" <<'EOF'
+          allprojects {
+              tasks.withType(JavaCompile).configureEach {
+                  options.release = 8
+              }
+          }
+          EOF
+
+          gradle clean test \
+            --no-daemon \
+            --console=plain \
+            --init-script "$RUNNER_TEMP/java8-release.gradle"
+
+      - name: Upload JUnit test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: byblack-junit-results
+          path: |
+            build/test-results/test/
+            build/reports/tests/test/
+          if-no-files-found: warn
